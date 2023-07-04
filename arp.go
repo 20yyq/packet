@@ -1,7 +1,7 @@
 // @@
 // @ Author       : Eacher
 // @ Date         : 2023-07-01 15:19:37
-// @ LastEditTime : 2023-07-01 16:04:30
+// @ LastEditTime : 2023-07-04 09:11:59
 // @ LastEditors  : Eacher
 // @ --------------------------------------------------------------------------------<
 // @ Description  : 
@@ -13,11 +13,8 @@ package packet
 import (
 	"net"
 	"unsafe"
-	"syscall"
 	"encoding/binary"
 )
-
-const hexDigit = "0123456789abcdef"
 
 /*
 	Also define the following values (to be discussed later):
@@ -26,15 +23,17 @@ const hexDigit = "0123456789abcdef"
     ares_op$REPLY   	(= 2).
  */
 const (
-	ETHERNETTYPE= 0x01
-	REQUEST 	= 0x01
-	REPLY 		= 0x02
+	ARP_ETHERNETTYPE= 0x01
+	ARP_REQUEST 	= 0x01
+	ARP_REPLY 		= 0x02
 
-	SizeofArpPacket = 42
+	SizeofArpPacket = 0x2a
 )
 
 type HardwareAddr [6]byte 
+type IPv4 [4]byte 
 
+const hexDigit = "0123456789abcdef"
 
 /*
     Ethernet transmission layer (not necessarily accessible to the user):
@@ -61,9 +60,9 @@ type ArpPacket struct {
 	IPLen 		 	uint8
 	Operation 	 	uint16
 	SendHardware 	HardwareAddr
-	SendIP 			[4]byte
+	SendIP 			IPv4
 	TargetHardware 	HardwareAddr
-	TargetIP 		[4]byte
+	TargetIP 		IPv4
 }
 
 var Broadcast = HardwareAddr{0xff, 0xff, 0xff, 0xff, 0xff, 0xff}
@@ -83,6 +82,31 @@ func (h *HardwareAddr) String() string {
 	return string(buf)
 }
 
+//go:linkname ubtoa net.ubtoa
+func ubtoa([]byte, int, byte) int
+
+func (v4 *IPv4) String() string {
+	if len(v4) == 0 {
+		return ""
+	}
+	b := make([]byte, len("255.255.255.255"))
+
+	n := ubtoa(b, 0, v4[0])
+	b[n] = '.'
+	n++
+
+	n += ubtoa(b, n, v4[1])
+	b[n] = '.'
+	n++
+
+	n += ubtoa(b, n, v4[2])
+	b[n] = '.'
+	n++
+
+	n += ubtoa(b, n, v4[3])
+	return string(b[:n])
+}
+
 func NewArpPacket(b [SizeofArpPacket]byte) (arp *ArpPacket) {
 	arp = (*ArpPacket)(unsafe.Pointer(&b[0]))
 	arp.FrameType 	 = binary.BigEndian.Uint16(b[12:14])
@@ -94,18 +118,18 @@ func NewArpPacket(b [SizeofArpPacket]byte) (arp *ArpPacket) {
 
 func (arp *ArpPacket) WireFormat() []byte {
 	var b [SizeofArpPacket]byte
-	*(*HardwareAddr)(unsafe.Pointer(&b[0:6][0])) = arp.HeadMAC[0]
-	*(*HardwareAddr)(unsafe.Pointer(&b[6:12][0])) = arp.HeadMAC[1]
+	*(*HardwareAddr)(b[0:6]) = arp.HeadMAC[0]
+	*(*HardwareAddr)(b[6:12]) = arp.HeadMAC[1]
 
-	*(*[2]byte)(unsafe.Pointer(&b[12:14][0])) = *(*[2]byte)(binary.BigEndian.AppendUint16(nil, arp.FrameType))
-	*(*[2]byte)(unsafe.Pointer(&b[14:16][0])) = *(*[2]byte)(binary.BigEndian.AppendUint16(nil, arp.HardwareType))
-	*(*[2]byte)(unsafe.Pointer(&b[16:18][0])) = *(*[2]byte)(binary.BigEndian.AppendUint16(nil, arp.ProtocolType))
+	*(*[2]byte)(b[12:14]) = ([2]byte)(binary.BigEndian.AppendUint16(nil, arp.FrameType))
+	*(*[2]byte)(b[14:16]) = ([2]byte)(binary.BigEndian.AppendUint16(nil, arp.HardwareType))
+	*(*[2]byte)(b[16:18]) = ([2]byte)(binary.BigEndian.AppendUint16(nil, arp.ProtocolType))
 	b[18], b[19] = arp.HardwareLen, arp.IPLen
-	*(*[2]byte)(unsafe.Pointer(&b[20:22][0])) = *(*[2]byte)(binary.BigEndian.AppendUint16(nil, arp.Operation))
-	*(*HardwareAddr)(unsafe.Pointer(&b[22:28][0])) = arp.SendHardware
-	*(*[4]byte)(unsafe.Pointer(&b[28:32][0])) = arp.SendIP
-	*(*HardwareAddr)(unsafe.Pointer(&b[32:38][0])) = arp.TargetHardware
-	*(*[4]byte)(unsafe.Pointer(&b[38:42][0])) = arp.TargetIP
+	*(*[2]byte)(b[20:22]) = ([2]byte)(binary.BigEndian.AppendUint16(nil, arp.Operation))
+	*(*HardwareAddr)(b[22:28]) = arp.SendHardware
+	*(*IPv4)(b[28:32]) = arp.SendIP
+	*(*HardwareAddr)(b[32:38]) = arp.TargetHardware
+	*(*IPv4)(b[38:42]) = arp.TargetIP
 	return b[:]
 }
 
