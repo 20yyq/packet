@@ -1,7 +1,7 @@
 // @@
 // @ Author       : Eacher
 // @ Date         : 2023-07-01 15:19:37
-// @ LastEditTime : 2023-07-04 09:11:59
+// @ LastEditTime : 2023-07-04 09:24:11
 // @ LastEditors  : Eacher
 // @ --------------------------------------------------------------------------------<
 // @ Description  : 
@@ -86,9 +86,6 @@ func (h *HardwareAddr) String() string {
 func ubtoa([]byte, int, byte) int
 
 func (v4 *IPv4) String() string {
-	if len(v4) == 0 {
-		return ""
-	}
 	b := make([]byte, len("255.255.255.255"))
 
 	n := ubtoa(b, 0, v4[0])
