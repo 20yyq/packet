@@ -1,7 +1,7 @@
 // @@
 // @ Author       : Eacher
 // @ Date         : 2023-07-01 15:19:37
-// @ LastEditTime : 2023-07-04 09:24:11
+// @ LastEditTime : 2023-07-08 11:34:55
 // @ LastEditors  : Eacher
 // @ --------------------------------------------------------------------------------<
 // @ Description  : 
@@ -118,11 +118,11 @@ func (arp *ArpPacket) WireFormat() []byte {
 	*(*HardwareAddr)(b[0:6]) = arp.HeadMAC[0]
 	*(*HardwareAddr)(b[6:12]) = arp.HeadMAC[1]
 
-	*(*[2]byte)(b[12:14]) = ([2]byte)(binary.BigEndian.AppendUint16(nil, arp.FrameType))
-	*(*[2]byte)(b[14:16]) = ([2]byte)(binary.BigEndian.AppendUint16(nil, arp.HardwareType))
-	*(*[2]byte)(b[16:18]) = ([2]byte)(binary.BigEndian.AppendUint16(nil, arp.ProtocolType))
+	binary.BigEndian.PutUint16(b[12:14], arp.FrameType)
+	binary.BigEndian.PutUint16(b[14:16], arp.HardwareType)
+	binary.BigEndian.PutUint16(b[16:18], arp.ProtocolType)
 	b[18], b[19] = arp.HardwareLen, arp.IPLen
-	*(*[2]byte)(b[20:22]) = ([2]byte)(binary.BigEndian.AppendUint16(nil, arp.Operation))
+	binary.BigEndian.PutUint16(b[20:22], arp.Operation)
 	*(*HardwareAddr)(b[22:28]) = arp.SendHardware
 	*(*IPv4)(b[28:32]) = arp.SendIP
 	*(*HardwareAddr)(b[32:38]) = arp.TargetHardware
@@ -135,23 +135,7 @@ func (arp *ArpPacket) String() string {
 	if 1 != arp.Operation {
 		str = "OP: replay" 
 	}
-	buf := make([]byte, 0, len(arp.SendHardware)*3-1)
-	for i, b := range arp.SendHardware {
-		if i > 0 {
-			buf = append(buf, ':')
-		}
-		buf = append(buf, hexDigit[b>>4])
-		buf = append(buf, hexDigit[b&0xF])
-	}
-	str += " Src-MAC: " + string(buf) + " Src-IP: " + net.IP(arp.SendIP[:]).String()
-	buf = make([]byte, 0, len(arp.TargetHardware)*3-1)
-	for i, b := range arp.TargetHardware {
-		if i > 0 {
-			buf = append(buf, ':')
-		}
-		buf = append(buf, hexDigit[b>>4])
-		buf = append(buf, hexDigit[b&0xF])
-	}
-	str += " Dst-MAC: " + string(buf) + " Dst-IP: " + net.IP(arp.TargetIP[:]).String()
+	str += " Src-MAC: " + arp.SendHardware.String() + " Src-IP: " + net.IP(arp.SendIP[:]).String()
+	str += " Dst-MAC: " + arp.TargetHardware.String() + " Dst-IP: " + net.IP(arp.TargetIP[:]).String()
 	return str
 }

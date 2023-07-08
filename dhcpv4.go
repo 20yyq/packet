@@ -1,7 +1,7 @@
 // @@
 // @ Author       : Eacher
 // @ Date         : 2023-07-04 08:48:44
-// @ LastEditTime : 2023-07-05 13:33:39
+// @ LastEditTime : 2023-07-08 11:21:56
 // @ LastEditors  : Eacher
 // @ --------------------------------------------------------------------------------<
 // @ Description  : 
@@ -97,9 +97,9 @@ func (dhcp *DhcpV4Packet) WireFormat() []byte {
 		copy(b[SizeofDhcpV4Packet:], opb)
 		opb, b[len(b) - 1] = b, 255
 		b[0], b[1], b[2], b[3] 	= dhcp.Op, dhcp.HardwareType, dhcp.HardwareLen, dhcp.Hops
-		*(*[4]byte)(b[4:8]) 	= ([4]byte)(binary.BigEndian.AppendUint32(nil, dhcp.XID))
-		*(*[2]byte)(b[8:10]) 	= ([2]byte)(binary.BigEndian.AppendUint16(nil, dhcp.Secs))
-		*(*[2]byte)(b[10:12]) 	= ([2]byte)(binary.BigEndian.AppendUint16(nil, dhcp.Flags))
+		binary.BigEndian.PutUint32(b[4:8], dhcp.XID)
+		binary.BigEndian.PutUint16(b[8:10], dhcp.Secs)
+		binary.BigEndian.PutUint16(b[10:12], dhcp.Flags)
 		*(*IPv4)(b[12:16]) 	= dhcp.CIAddr
 		*(*IPv4)(b[16:20]) 	= dhcp.YIAddr
 		*(*IPv4)(b[20:24]) 	= dhcp.SIAddr
@@ -758,7 +758,7 @@ const (
 	DHCP_H_node
 )
 
-func GetNetBIOSNodeType(t DHCP_NetBIOS_Node_Type) *OptionsPacket {
+func SetDHCPNetBIOSNodeType(t DHCP_NetBIOS_Node_Type) *OptionsPacket {
 	return &OptionsPacket{46, 1, []byte{byte(t)}}
 }
 
@@ -813,6 +813,6 @@ const (
 	DHCP_IP_Address_Lease DHCP_TIME_TYPE = 51
 )
 
-func GetTime(t DHCP_TIME_TYPE, d time.Duration) *OptionsPacket {
+func SetDHCPTime(t DHCP_TIME_TYPE, d time.Duration) *OptionsPacket {
 	return &OptionsPacket{uint8(t), 4, binary.BigEndian.AppendUint32(nil, uint32(d.Seconds()))}
 }
