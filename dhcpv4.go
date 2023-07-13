@@ -1,7 +1,7 @@
 // @@
 // @ Author       : Eacher
 // @ Date         : 2023-07-04 08:48:44
-// @ LastEditTime : 2023-07-08 14:33:01
+// @ LastEditTime : 2023-07-13 15:38:22
 // @ LastEditors  : Eacher
 // @ --------------------------------------------------------------------------------<
 // @ Description  : 
@@ -19,19 +19,22 @@ import (
 var MagicCookie 		= [4]byte{99, 130, 83, 99}
 
 const (
-	DHCP_ServerPort 	= 67
-	DHCP_ClientPort 	= 68
+	DHCP_ServerPort 	= 0x43
+	DHCP_ClientPort 	= 0x44
 
-	DHCP_BOOTREQUEST 	= 1
-	DHCP_BOOTREPLY 		= 2
-	DHCP_Ethernet_TYPE 	= 1
-	DHCP_Ethernet_LEN 	= 6
+	DHCP_BOOTREQUEST 	= 0x01
+	DHCP_BOOTREPLY 		= 0x02
+	DHCP_Ethernet_TYPE 	= 0x01
+	DHCP_Ethernet_LEN 	= 0x06
 
-	SizeofDhcpV4Packet 	= 240
-	SizeofOptionsPacket = 2
+	SizeofDhcpV4Packet 	= 0xf0
+	SizeofOptionsPacket = 0x02
 )
 
 /*
+	// 14.byte  EthernetPacket 
+	// 20.byte  IPv4Packet 
+
 	FIELD   BYTES   DESCRIPTION
 	-----   -----   -----------
 	op      1       packet op code / message type. 1 = BOOTREQUEST, 2 = BOOTREPLY

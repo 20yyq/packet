@@ -1,7 +1,7 @@
 // @@
 // @ Author       : Eacher
 // @ Date         : 2023-07-01 15:19:37
-// @ LastEditTime : 2023-07-08 11:34:55
+// @ LastEditTime : 2023-07-13 15:16:04
 // @ LastEditors  : Eacher
 // @ --------------------------------------------------------------------------------<
 // @ Description  : 
@@ -11,7 +11,6 @@
 package packet
 
 import (
-	"net"
 	"unsafe"
 	"encoding/binary"
 )
@@ -27,19 +26,12 @@ const (
 	ARP_REQUEST 	= 0x01
 	ARP_REPLY 		= 0x02
 
-	SizeofArpPacket = 0x2a
+	SizeofArpPacket = 0x1c
 )
-
-type HardwareAddr [6]byte 
-type IPv4 [4]byte 
-
-const hexDigit = "0123456789abcdef"
 
 /*
     Ethernet transmission layer (not necessarily accessible to the user):
-	6.byte  48.bit: Ethernet address of destination
-	6.byte  48.bit: Ethernet address of sender
-	2.byte  16.bit: Protocol type = ether_type$ADDRESS_RESOLUTION Ethernet packet data:
+    // 14.byte  EthernetPacket 
 	2.byte  16.bit: (ar$hrd) Hardware address space (e.g., Ethernet, Packet Radio Net.)
 	2.byte  16.bit: (ar$pro) Protocol address space.  For Ethernet hardware, this is from the set of type fields ether_typ$<protocol>.
 	1.byte   8.bit: (ar$hln) byte length of each hardware address
@@ -52,8 +44,6 @@ const hexDigit = "0123456789abcdef"
 
  */
 type ArpPacket struct {
-	HeadMAC 	 	[2]HardwareAddr
-	FrameType 	 	uint16
 	HardwareType 	uint16
 	ProtocolType 	uint16
 	HardwareLen  	uint8
@@ -65,68 +55,24 @@ type ArpPacket struct {
 	TargetIP 		IPv4
 }
 
-var Broadcast = HardwareAddr{0xff, 0xff, 0xff, 0xff, 0xff, 0xff}
-
-func (h *HardwareAddr) String() string {
-	if len(h) == 0 {
-		return ""
-	}
-	buf := make([]byte, 0, len(h)*3-1)
-	for i, b := range h {
-		if i > 0 {
-			buf = append(buf, ':')
-		}
-		buf = append(buf, hexDigit[b>>4])
-		buf = append(buf, hexDigit[b&0xF])
-	}
-	return string(buf)
-}
-
-//go:linkname ubtoa net.ubtoa
-func ubtoa([]byte, int, byte) int
-
-func (v4 *IPv4) String() string {
-	b := make([]byte, len("255.255.255.255"))
-
-	n := ubtoa(b, 0, v4[0])
-	b[n] = '.'
-	n++
-
-	n += ubtoa(b, n, v4[1])
-	b[n] = '.'
-	n++
-
-	n += ubtoa(b, n, v4[2])
-	b[n] = '.'
-	n++
-
-	n += ubtoa(b, n, v4[3])
-	return string(b[:n])
-}
-
 func NewArpPacket(b [SizeofArpPacket]byte) (arp *ArpPacket) {
 	arp = (*ArpPacket)(unsafe.Pointer(&b[0]))
-	arp.FrameType 	 = binary.BigEndian.Uint16(b[12:14])
-	arp.HardwareType = binary.BigEndian.Uint16(b[14:16])
-	arp.ProtocolType = binary.BigEndian.Uint16(b[16:18])
-	arp.Operation 	 = binary.BigEndian.Uint16(b[20:22])
+	arp.HardwareType 	= binary.BigEndian.Uint16(b[0:2])
+	arp.ProtocolType 	= binary.BigEndian.Uint16(b[2:4])
+	arp.Operation 		= binary.BigEndian.Uint16(b[6:8])
 	return
 }
 
 func (arp *ArpPacket) WireFormat() []byte {
 	var b [SizeofArpPacket]byte
-	*(*HardwareAddr)(b[0:6]) = arp.HeadMAC[0]
-	*(*HardwareAddr)(b[6:12]) = arp.HeadMAC[1]
-
-	binary.BigEndian.PutUint16(b[12:14], arp.FrameType)
-	binary.BigEndian.PutUint16(b[14:16], arp.HardwareType)
-	binary.BigEndian.PutUint16(b[16:18], arp.ProtocolType)
-	b[18], b[19] = arp.HardwareLen, arp.IPLen
-	binary.BigEndian.PutUint16(b[20:22], arp.Operation)
-	*(*HardwareAddr)(b[22:28]) = arp.SendHardware
-	*(*IPv4)(b[28:32]) = arp.SendIP
-	*(*HardwareAddr)(b[32:38]) = arp.TargetHardware
-	*(*IPv4)(b[38:42]) = arp.TargetIP
+	binary.BigEndian.PutUint16(b[:2], arp.HardwareType)
+	binary.BigEndian.PutUint16(b[2:4], arp.ProtocolType)
+	b[4], b[5] = arp.HardwareLen, arp.IPLen
+	binary.BigEndian.PutUint16(b[6:8], arp.Operation)
+	*(*HardwareAddr)(b[8:14]) = arp.SendHardware
+	*(*IPv4)(b[14:18]) = arp.SendIP
+	*(*HardwareAddr)(b[18:24]) = arp.TargetHardware
+	*(*IPv4)(b[24:28]) = arp.TargetIP
 	return b[:]
 }
 
@@ -135,7 +81,7 @@ func (arp *ArpPacket) String() string {
 	if 1 != arp.Operation {
 		str = "OP: replay" 
 	}
-	str += " Src-MAC: " + arp.SendHardware.String() + " Src-IP: " + net.IP(arp.SendIP[:]).String()
-	str += " Dst-MAC: " + arp.TargetHardware.String() + " Dst-IP: " + net.IP(arp.TargetIP[:]).String()
+	str += " Src-MAC: " + arp.SendHardware.String() + " Src-IP: " + arp.SendIP.String()
+	str += " Dst-MAC: " + arp.TargetHardware.String() + " Dst-IP: " + arp.TargetIP.String()
 	return str
 }
