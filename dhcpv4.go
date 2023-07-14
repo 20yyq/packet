@@ -1,7 +1,7 @@
 // @@
 // @ Author       : Eacher
 // @ Date         : 2023-07-04 08:48:44
-// @ LastEditTime : 2023-07-13 15:38:22
+// @ LastEditTime : 2023-07-14 10:18:56
 // @ LastEditors  : Eacher
 // @ --------------------------------------------------------------------------------<
 // @ Description  : 
@@ -69,7 +69,7 @@ type DhcpV4Packet struct {
 	HostName 		[64]byte
 	FileName 		[128]byte
 	cookie   		[4]byte
-	Options  		[]*OptionsPacket
+	Options  		[]OptionsPacket
 }
 
 type OptionsPacket struct {
@@ -78,11 +78,13 @@ type OptionsPacket struct {
 	Value 		[]byte
 }
 
-func NewDhcpV4Packet(b []byte) (dhcp *DhcpV4Packet) {
+// 14.byte  EthernetPacket
+// 20.byte  IPv4Packet 或者 IPv6Packet
+func NewDhcpV4Packet(b []byte) (dhcp DhcpV4Packet) {
 	if len(b) > SizeofDhcpV4Packet {
 		back := make([]byte, len(b))
 		copy(back, b)
-		dhcp = (*DhcpV4Packet)(unsafe.Pointer((*[SizeofDhcpV4Packet]byte)(back)))
+		dhcp = *(*DhcpV4Packet)(unsafe.Pointer((*[SizeofDhcpV4Packet]byte)(back)))
 		dhcp.XID = binary.BigEndian.Uint32(back[4:8])
 		dhcp.Secs = binary.BigEndian.Uint16(back[8:10])
 		dhcp.Flags 	 = binary.BigEndian.Uint16(back[10:12])
@@ -91,7 +93,7 @@ func NewDhcpV4Packet(b []byte) (dhcp *DhcpV4Packet) {
 	return
 }
 
-func (dhcp *DhcpV4Packet) WireFormat() []byte {
+func (dhcp DhcpV4Packet) WireFormat() []byte {
 	var opb []byte
 	if 0 < len(dhcp.Options) {
 		for _, val := range dhcp.Options {
@@ -116,24 +118,24 @@ func (dhcp *DhcpV4Packet) WireFormat() []byte {
 	return opb
 }
 
-func NewOptionsPacket(b []byte) (list []*OptionsPacket) {
+func NewOptionsPacket(b []byte) (list []OptionsPacket) {
 	var idx, next uint8
 	if len(b) > SizeofOptionsPacket {
-		opp := &OptionsPacket{b[idx], b[idx+1], nil}
+		opp := OptionsPacket{b[idx], b[idx+1], nil}
 		idx = 2
 		for opp.Code != 255 {
 			next = idx + opp.Length
 			opp.Value = make([]byte, opp.Length)
 			copy(opp.Value, b[idx:next])
 			list = append(list, opp)
-			opp = &OptionsPacket{b[next], b[next+1], nil}
+			opp = OptionsPacket{b[next], b[next+1], nil}
 			idx = next + 2
 		}
 	}
 	return
 }
 
-func (opp *OptionsPacket) WireFormat() []byte {
+func (opp OptionsPacket) WireFormat() []byte {
 	b := make([]byte, SizeofOptionsPacket)
 	b[0], b[1] = opp.Code, opp.Length
 	return append(b, opp.Value...)
@@ -169,8 +171,8 @@ const (
 	DHCP_INFORM
 )
 
-func SetDHCPMessage(t DHCP_Message_Type) *OptionsPacket {
-	return &OptionsPacket{53, 1, []byte{byte(t)}}
+func SetDHCPMessage(t DHCP_Message_Type) OptionsPacket {
+	return OptionsPacket{53, 1, []byte{byte(t)}}
 }
 
 /*
@@ -192,8 +194,8 @@ func SetDHCPMessage(t DHCP_Message_Type) *OptionsPacket {
 	|  55 |  n  |  c1 |  c2 | ...
 	+-----+-----+-----+-----+---
  */
-func SetDHCPOptionsRequestList(codes ...uint8) *OptionsPacket {
-	return &OptionsPacket{55, uint8(len(codes)), codes}
+func SetDHCPOptionsRequestList(codes ...uint8) OptionsPacket {
+	return OptionsPacket{55, uint8(len(codes)), codes}
 }
 
 /*
@@ -212,11 +214,11 @@ func SetDHCPOptionsRequestList(codes ...uint8) *OptionsPacket {
 	|  57 |  2  |  l1 |  l2 |
 	+-----+-----+-----+-----+
  */
-func SetDHCPMaximumMessageSize(size uint16) *OptionsPacket {
+func SetDHCPMaximumMessageSize(size uint16) OptionsPacket {
 	if size < 576 {
 		size = 576
 	}
-	return &OptionsPacket{57, 2, binary.BigEndian.AppendUint16(nil, size)}
+	return OptionsPacket{57, 2, binary.BigEndian.AppendUint16(nil, size)}
 }
 
 /*
@@ -319,13 +321,13 @@ const (
 	DHCP_Vendor_Class_Identifier DHCP_STRING_TYPE 				= 60
 )
 
-func SetDHCPString(t DHCP_STRING_TYPE, s string) *OptionsPacket {
+func SetDHCPString(t DHCP_STRING_TYPE, s string) OptionsPacket {
 	length := len(s) + 1
 	if length > 255 {
-		return nil
+		return OptionsPacket{}
 	}
 	s += string([]byte{0})
-	return &OptionsPacket{uint8(t), uint8(length), []byte(s)}
+	return OptionsPacket{uint8(t), uint8(length), []byte(s)}
 }
 
 /*
@@ -723,16 +725,16 @@ const (
 	DHCP_STDA_Server
 )
 
-func SetDHCPIPv4(t DHCP_IPv4_TYPE, ip ...IPv4) *OptionsPacket {
+func SetDHCPIPv4(t DHCP_IPv4_TYPE, ip ...IPv4) OptionsPacket {
 	length := len(ip)*4
 	if length > 255 || length < 1 {
-		return nil
+		return OptionsPacket{}
 	}
 	b := make([]byte, length)
 	for i, v := range ip {
 		copy(b[i*4:], v[:])
 	}
-	return &OptionsPacket{uint8(t), uint8(length), b}
+	return OptionsPacket{uint8(t), uint8(length), b}
 }
 
 /*
@@ -762,8 +764,8 @@ const (
 	DHCP_H_node
 )
 
-func SetDHCPNetBIOSNodeType(t DHCP_NetBIOS_Node_Type) *OptionsPacket {
-	return &OptionsPacket{46, 1, []byte{byte(t)}}
+func SetDHCPNetBIOSNodeType(t DHCP_NetBIOS_Node_Type) OptionsPacket {
+	return OptionsPacket{46, 1, []byte{byte(t)}}
 }
 
 /*
@@ -817,6 +819,6 @@ const (
 	DHCP_IP_Address_Lease DHCP_TIME_TYPE = 51
 )
 
-func SetDHCPTime(t DHCP_TIME_TYPE, d time.Duration) *OptionsPacket {
-	return &OptionsPacket{uint8(t), 4, binary.BigEndian.AppendUint32(nil, uint32(d.Seconds()))}
+func SetDHCPTime(t DHCP_TIME_TYPE, d time.Duration) OptionsPacket {
+	return OptionsPacket{uint8(t), 4, binary.BigEndian.AppendUint32(nil, uint32(d.Seconds()))}
 }

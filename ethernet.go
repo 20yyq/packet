@@ -1,7 +1,7 @@
 // @@
 // @ Author       : Eacher
 // @ Date         : 2023-07-13 14:02:39
-// @ LastEditTime : 2023-07-13 15:16:29
+// @ LastEditTime : 2023-07-14 10:17:14
 // @ LastEditors  : Eacher
 // @ --------------------------------------------------------------------------------<
 // @ Description  : 
@@ -80,13 +80,13 @@ type EthernetPacket struct {
 	FrameType 	uint16
 }
 
-func NewEthernetPacket(b [SizeofEthernetPacket]byte) (eth *EthernetPacket) {
-	eth = (*EthernetPacket)(unsafe.Pointer(&b[0]))
+func NewEthernetPacket(b [SizeofEthernetPacket]byte) (eth EthernetPacket) {
+	eth = *(*EthernetPacket)(unsafe.Pointer(&b[0]))
 	eth.FrameType = binary.BigEndian.Uint16(b[12:14])
 	return
 }
 
-func (eth *EthernetPacket) WireFormat() []byte {
+func (eth EthernetPacket) WireFormat() []byte {
 	var b [SizeofEthernetPacket]byte
 	*(*HardwareAddr)(b[0:6]) = eth.HeadMAC[0]
 	*(*HardwareAddr)(b[6:12]) = eth.HeadMAC[1]

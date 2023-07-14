@@ -1,7 +1,7 @@
 // @@
 // @ Author       : Eacher
 // @ Date         : 2023-07-01 15:19:37
-// @ LastEditTime : 2023-07-13 15:16:04
+// @ LastEditTime : 2023-07-14 10:19:44
 // @ LastEditors  : Eacher
 // @ --------------------------------------------------------------------------------<
 // @ Description  : 
@@ -55,15 +55,15 @@ type ArpPacket struct {
 	TargetIP 		IPv4
 }
 
-func NewArpPacket(b [SizeofArpPacket]byte) (arp *ArpPacket) {
-	arp = (*ArpPacket)(unsafe.Pointer(&b[0]))
+func NewArpPacket(b [SizeofArpPacket]byte) (arp ArpPacket) {
+	arp = *(*ArpPacket)(unsafe.Pointer(&b[0]))
 	arp.HardwareType 	= binary.BigEndian.Uint16(b[0:2])
 	arp.ProtocolType 	= binary.BigEndian.Uint16(b[2:4])
 	arp.Operation 		= binary.BigEndian.Uint16(b[6:8])
 	return
 }
 
-func (arp *ArpPacket) WireFormat() []byte {
+func (arp ArpPacket) WireFormat() []byte {
 	var b [SizeofArpPacket]byte
 	binary.BigEndian.PutUint16(b[:2], arp.HardwareType)
 	binary.BigEndian.PutUint16(b[2:4], arp.ProtocolType)
@@ -76,7 +76,7 @@ func (arp *ArpPacket) WireFormat() []byte {
 	return b[:]
 }
 
-func (arp *ArpPacket) String() string {
+func (arp ArpPacket) String() string {
 	str := "OP: request"
 	if 1 != arp.Operation {
 		str = "OP: replay" 

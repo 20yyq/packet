@@ -1,7 +1,7 @@
 // @@
 // @ Author       : Eacher
 // @ Date         : 2023-07-13 15:20:40
-// @ LastEditTime : 2023-07-13 15:57:04
+// @ LastEditTime : 2023-07-14 10:41:10
 // @ LastEditors  : Eacher
 // @ --------------------------------------------------------------------------------<
 // @ Description  : 
@@ -97,16 +97,22 @@ type IPv4Packet struct {
 	Options  []byte
 }
 
-func NewIPv4Packet(b []byte) (ipv4 *IPv4Packet) {
+// 14.byte  EthernetPacket
+// 返回负载下标起始位
+func NewIPv4Packet(b []byte) (ipv4 IPv4Packet, next uint8) {
 	if len(b) < SizeofIPv4Packet {
 		return
 	}
-	ipv4 = (*IPv4Packet)(unsafe.Pointer((*[SizeofIPv4Packet]byte)(b)))
-	ipv4.IHL = (ipv4.Version & 0b00001111) << 2
+	ipv4, next = *(*IPv4Packet)(unsafe.Pointer((*[SizeofIPv4Packet]byte)(b))), SizeofIPv4Packet
+	ipv4.IHL = ipv4.Version & 0b00001111 << 2
 	ipv4.Version >>= 4
-	if ipv4.Version != 4 || len(b[SizeofIPv4Packet:]) < int(ipv4.IHL - SizeofIPv4Packet) {
-		ipv4 = nil
+	if ipv4.Version != 4 || ipv4.IHL < SizeofIPv4Packet || len(b) < int(ipv4.IHL) {
+		ipv4, next = IPv4Packet{}, 0
 		return
+	}
+	if ipv4.IHL > SizeofIPv4Packet {
+		ipv4.Options, next = make([]byte, ipv4.IHL - SizeofIPv4Packet), ipv4.IHL
+		copy(ipv4.Options, b[SizeofTCPPacket:ipv4.IHL])
 	}
 	ipv4.TotalLen 	= binary.BigEndian.Uint16(b[2:4])
 	ipv4.ID 		= binary.BigEndian.Uint16(b[4:6])
@@ -117,16 +123,26 @@ func NewIPv4Packet(b []byte) (ipv4 *IPv4Packet) {
 		ipv4.TotalLen 	= ipv4NativeEndian.Uint16(b[2:4]) + uint16(ipv4.IHL)
 		ipv4.FragOff 	= ipv4NativeEndian.Uint16(b[6:8])
 	}
-	ipv4.Flags 		= uint8((ipv4.FragOff & 0b1110000000000000) >> 13)
+	ipv4.Flags 		= uint8(ipv4.FragOff & 0b1110000000000000 >> 13)
 	ipv4.FragOff  	= ipv4.FragOff & 0b0001111111111111
 	ipv4.Options 	= make([]byte, ipv4.IHL - SizeofIPv4Packet)
 	copy(ipv4.Options, b[SizeofIPv4Packet: SizeofIPv4Packet + ipv4.IHL])
 	return
 }
 
-func (ipv4 *IPv4Packet) WireFormat() []byte {
-	b := make([]byte, SizeofIPv4Packet + len(ipv4.Options))
-	b[0] = byte(ipv4.Version << 4 | uint8(((SizeofIPv4Packet + len(ipv4.Options)) >> 2 & 0b00001111)))
+func (ipv4 IPv4Packet) WireFormat() []byte {
+	opLen := len(ipv4.Options)
+	if opLen > 40 {
+		return nil
+	}
+	b := make([]byte, SizeofIPv4Packet + opLen)
+	if opLen > 0 {
+		copy(b[SizeofIPv4Packet:], ipv4.Options)
+		if opLen % 4 != 0 {
+			b = append(b, make([]byte, opLen % 4)...) 
+		}
+	}
+	b[0] = byte(ipv4.Version << 4 | uint8(((SizeofIPv4Packet + opLen) >> 2 & 0b00001111)))
 	b[1], b[8], b[9] = ipv4.TOS, ipv4.TTL, ipv4.Protocol
 	binary.BigEndian.PutUint16(b[2:4], ipv4.TotalLen)
 	binary.BigEndian.PutUint16(b[4:6], ipv4.ID)
@@ -139,13 +155,10 @@ func (ipv4 *IPv4Packet) WireFormat() []byte {
 	}
 	*(*IPv4)(b[12:16]) = ipv4.Src
 	*(*IPv4)(b[16:20]) = ipv4.Dst
-	if len(ipv4.Options) > 0 {
-		copy(b[SizeofIPv4Packet:], ipv4.Options)
-	}
 	return b
 }
 
-func (ipv4 *IPv4Packet) String() string {
+func (ipv4 IPv4Packet) String() string {
 	str := fmt.Sprintf(
 		`V=%d IHL=%d TOS=%#x TotalLen=%d ID=%#x Flags=%#x FragOff=%#x TTL=%d Protocol=%d Checksum=%#x Src=%v Dst=%v`, 
 		ipv4.Version, ipv4.IHL, ipv4.TOS, ipv4.TotalLen, ipv4.ID, ipv4.Flags, 
