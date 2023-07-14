@@ -1,7 +1,7 @@
 // @@
 // @ Author       : Eacher
 // @ Date         : 2023-07-13 15:20:40
-// @ LastEditTime : 2023-07-14 10:41:10
+// @ LastEditTime : 2023-07-14 11:27:52
 // @ LastEditors  : Eacher
 // @ --------------------------------------------------------------------------------<
 // @ Description  : 
@@ -123,10 +123,8 @@ func NewIPv4Packet(b []byte) (ipv4 IPv4Packet, next uint8) {
 		ipv4.TotalLen 	= ipv4NativeEndian.Uint16(b[2:4]) + uint16(ipv4.IHL)
 		ipv4.FragOff 	= ipv4NativeEndian.Uint16(b[6:8])
 	}
-	ipv4.Flags 		= uint8(ipv4.FragOff & 0b1110000000000000 >> 13)
-	ipv4.FragOff  	= ipv4.FragOff & 0b0001111111111111
-	ipv4.Options 	= make([]byte, ipv4.IHL - SizeofIPv4Packet)
-	copy(ipv4.Options, b[SizeofIPv4Packet: SizeofIPv4Packet + ipv4.IHL])
+	ipv4.Flags = uint8(ipv4.FragOff & 0b1110000000000000 >> 13)
+	ipv4.FragOff &= 0b0001111111111111
 	return
 }
 
@@ -138,9 +136,7 @@ func (ipv4 IPv4Packet) WireFormat() []byte {
 	b := make([]byte, SizeofIPv4Packet + opLen)
 	if opLen > 0 {
 		copy(b[SizeofIPv4Packet:], ipv4.Options)
-		if opLen % 4 != 0 {
-			b = append(b, make([]byte, opLen % 4)...) 
-		}
+		b = append(b, make([]byte, opLen % 4)...)
 	}
 	b[0] = byte(ipv4.Version << 4 | uint8(((SizeofIPv4Packet + opLen) >> 2 & 0b00001111)))
 	b[1], b[8], b[9] = ipv4.TOS, ipv4.TTL, ipv4.Protocol

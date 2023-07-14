@@ -1,7 +1,7 @@
 // @@
 // @ Author       : Eacher
 // @ Date         : 2023-07-14 08:11:29
-// @ LastEditTime : 2023-07-14 10:36:38
+// @ LastEditTime : 2023-07-14 14:10:37
 // @ LastEditors  : Eacher
 // @ --------------------------------------------------------------------------------<
 // @ Description  : 
@@ -11,12 +11,11 @@
 package packet
 
 import (
-	"unsafe"
 	"encoding/binary"
 )
 
 const (
-	SizeofTCPPacket = 20
+	SizeofTCPPacket = 0x14
 )
 
 /*
@@ -130,9 +129,7 @@ func (tcp TCPPacket) WireFormat() []byte {
 	b := make([]byte, SizeofTCPPacket + opLen)
 	if opLen > 0 {
 		copy(b[SizeofTCPPacket:], tcp.Options)
-		if opLen % 4 != 0 {
-			b = append(b, make([]byte, opLen % 4)...) 
-		}
+		b = append(b, make([]byte, opLen % 4)...)
 	}
 	binary.BigEndian.PutUint16(b[:2], tcp.SrcPort)
 	binary.BigEndian.PutUint16(b[2:4], tcp.DstPort)
@@ -158,7 +155,7 @@ func (tcp TCPPacket) WireFormat() []byte {
 	if tcp.FIN {
 		tmp |= 0b0000000000000001
 	}
-	*(*uint16)(unsafe.Pointer(&b[12])) = tmp
+	binary.BigEndian.PutUint16(b[12:14], tmp)
 	binary.BigEndian.PutUint16(b[14:16], tcp.Window)
 	binary.BigEndian.PutUint16(b[16:18], tcp.CheckSum)
 	binary.BigEndian.PutUint16(b[18:20], tcp.UrgentPtr)
