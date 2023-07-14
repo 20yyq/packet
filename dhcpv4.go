@@ -1,7 +1,7 @@
 // @@
 // @ Author       : Eacher
 // @ Date         : 2023-07-04 08:48:44
-// @ LastEditTime : 2023-07-14 10:18:56
+// @ LastEditTime : 2023-07-14 17:09:55
 // @ LastEditors  : Eacher
 // @ --------------------------------------------------------------------------------<
 // @ Description  : 
@@ -82,13 +82,11 @@ type OptionsPacket struct {
 // 20.byte  IPv4Packet 或者 IPv6Packet
 func NewDhcpV4Packet(b []byte) (dhcp DhcpV4Packet) {
 	if len(b) > SizeofDhcpV4Packet {
-		back := make([]byte, len(b))
-		copy(back, b)
-		dhcp = *(*DhcpV4Packet)(unsafe.Pointer((*[SizeofDhcpV4Packet]byte)(back)))
-		dhcp.XID = binary.BigEndian.Uint32(back[4:8])
-		dhcp.Secs = binary.BigEndian.Uint16(back[8:10])
-		dhcp.Flags 	 = binary.BigEndian.Uint16(back[10:12])
-		dhcp.Options = NewOptionsPacket(back[SizeofDhcpV4Packet:])
+		dhcp = *(*DhcpV4Packet)(unsafe.Pointer((*[SizeofDhcpV4Packet]byte)(b)))
+		dhcp.XID = binary.BigEndian.Uint32(b[4:8])
+		dhcp.Secs = binary.BigEndian.Uint16(b[8:10])
+		dhcp.Flags 	 = binary.BigEndian.Uint16(b[10:12])
+		dhcp.Options = NewOptionsPacket(b[SizeofDhcpV4Packet:])
 	}
 	return
 }
@@ -124,11 +122,12 @@ func NewOptionsPacket(b []byte) (list []OptionsPacket) {
 		opp := OptionsPacket{b[idx], b[idx+1], nil}
 		idx = 2
 		for opp.Code != 255 {
+			opp.Length = b[idx-1]
 			next = idx + opp.Length
 			opp.Value = make([]byte, opp.Length)
 			copy(opp.Value, b[idx:next])
 			list = append(list, opp)
-			opp = OptionsPacket{b[next], b[next+1], nil}
+			opp = OptionsPacket{b[next], 0, nil}
 			idx = next + 2
 		}
 	}
