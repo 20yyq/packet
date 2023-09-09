@@ -1,7 +1,7 @@
 // @@
 // @ Author       : Eacher
 // @ Date         : 2023-09-06 10:48:53
-// @ LastEditTime : 2023-09-06 10:49:07
+// @ LastEditTime : 2023-09-09 08:10:08
 // @ LastEditors  : Eacher
 // @ --------------------------------------------------------------------------------<
 // @ Description  : 
@@ -17,45 +17,64 @@ import (
 
 const (
 	// SocketCAN frame 最大 bytes 长度
-	FrameLength	= 0x10
+	CanFrameLength	= 0x10
 	// SocketCAN frame 数据最大 bytes 长度
-	DataLength	= 0x08
+	CanDataLength	= 0x08
+	// SocketCANFD frame 最大 bytes 长度
+	CanFDFrameLength= 0x48
+	// SocketCANFD frame 数据最大 bytes 长度
+	CanFDDataLength	= 0x40
 
 	FlagExtended= 0x80000000
 	FlagRemote	= 0x40000000
+	FlagError	= 0x20000000
 	MaxExtended	= 0x1FFFFFFF
 	MaxStandard	= 0x7FF
 )
 
-func NewFrame(b [FrameLength]byte) (f Frame) {
+func NewCanFrame(b [CanFrameLength]byte) (f Frame) {
 	f = *(*Frame)(unsafe.Pointer(&b[0]))
-	f.Extended = f.id & FlagExtended > 0
-	f.Remote = f.id & FlagRemote > 0
-	return
+	f.initAttr()
+}
+
+func NewCanFDFrame(b [CanFDFrameLength]byte) (f Frame) {
+	f = *(*Frame)(unsafe.Pointer(&b[0]))
+	f.canfd = true
+	f.initAttr()
 }
 
 // 来源 https://www.kernel.org/doc/Documentation/networking/can.txt
 // 
-// The basic CAN frame structure and the sockaddr structure are defined
-// in include/linux/can.h:
+// The struct canfd_frame is defined in include/linux/can.h:
 
-//   struct can_frame {
-//           canid_t can_id;  /* 32 bit CAN_ID + EFF/RTR/ERR flags */
-//           __u8    can_dlc; /* frame payload length in byte (0 .. 8) */
-//           __u8    __pad;   /* padding */
-//           __u8    __res0;  /* reserved / padding */
-//           __u8    __res1;  /* reserved / padding */
-//           __u8    data[8] __attribute__((aligned(8)));
-//   };
+// struct canfd_frame {
+//         canid_t can_id;  /* 32 bit CAN_ID + EFF/RTR/ERR flags */
+//         __u8    len;     /* frame payload length in byte (0 .. 64) */
+//         __u8    flags;   /* additional flags for CAN FD */
+//         __u8    __res0;  /* reserved / padding */
+//         __u8    __res1;  /* reserved / padding */
+//         __u8    data[64] __attribute__((aligned(8)));
+// };
 type Frame struct {
 	id			uint32
-	DLC			uint8
-	Pad			uint8
+	Len			uint8
+	Flags		uint8
 	Res0		uint8
 	Res1		uint8
-	Data		[DataLength]byte
+	Data		[CanFDDataLength]byte
+	
+	canfd		bool
 	Extended	bool
 	Remote		bool
+	Error		bool
+}
+
+func (f *Frame) initAttr() {
+	f.Error = f.id & FlagError > 0
+	if !f.Error {
+		f.Extended = f.id & FlagExtended > 0
+	}
+	f.Remote = f.id & FlagRemote > 0
 }
 
 func (f *Frame) SetID(id uint32) error {
@@ -63,10 +82,11 @@ func (f *Frame) SetID(id uint32) error {
 		return fmt.Errorf("invalid extended Can id: %v does not fit in 29 bits", id)
 	}
 	f.id = id
+	f.Error = f.id & FlagError > 0
 	if f.Remote {
 		f.id |= FlagRemote
 	}
-	if f.Extended {
+	if !f.Error && f.Extended {
 		f.id |= FlagExtended
 	} else if f.id > MaxStandard {
 		return fmt.Errorf("invalid standard Can id: %v does not fit in 11 bits", id)
@@ -82,14 +102,18 @@ func (f Frame) ID() uint32 {
 }
 
 func (f Frame) WireFormat() []byte {
-	var b [FrameLength]byte
+	var b [CanFDFrameLength]byte
 	*(*uint32)(unsafe.Pointer(&b[0])) = f.id
-	b[4], b[5], b[6], b[7] = f.DLC, f.Pad, f.Res0, f.Res1
-	*(*[DataLength]byte)(b[8:]) = f.Data
-	return b[:]
+	b[4], b[5], b[6], b[7] = f.Len, f.Flags, f.Res0, f.Res1
+	if f.canfd {
+		*(*[CanFDDataLength]byte)(b[8:]) = f.Data
+	} else {
+		*(*[CanDataLength]byte)(b[8:]) = ([CanDataLength]byte)(f.Data[:])
+	}
+	return b[:(f.Len+8)]
 }
 
 func (f Frame) String() string {
 	format := "%d\t%-4x\t[%x]\t% -24X\t%s\t%d\t%d\t%d\n"
-	return fmt.Sprintf(format, f.id, f.ID(), f.DLC, f.Data[:f.DLC], f.Data[:f.DLC], f.Pad, f.Res0, f.Res1)
+	return fmt.Sprintf(format, f.id, f.ID(), f.Len, f.Data[:f.Len], f.Data[:f.Len], f.Flags, f.Res0, f.Res1)
 }
