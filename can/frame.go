@@ -1,7 +1,7 @@
 // @@
 // @ Author       : Eacher
 // @ Date         : 2023-09-06 10:48:53
-// @ LastEditTime : 2023-09-09 11:33:40
+// @ LastEditTime : 2023-09-09 13:38:59
 // @ LastEditors  : Eacher
 // @ --------------------------------------------------------------------------------<
 // @ Description  : 
@@ -97,7 +97,7 @@ func (f *Frame) SetID(id uint32) error {
 }
 
 func (f Frame) ID() uint32 {
-	if f.id & FlagError == 0 && f.id & FlagExtended > 0 {
+	if f.id & FlagError > 0 || f.id & FlagExtended > 0 {
 		return f.id & MaxExtended
 	}
 	return f.id & MaxStandard
@@ -116,6 +116,6 @@ func (f Frame) WireFormat() []byte {
 }
 
 func (f Frame) String() string {
-	format := "%d\t%-4x\t[%x]\t% -24X\t%s\t%d\t%d\t%d\n"
+	format := "%d\t%-4X\t[%d]\t% -24X\t%s\t%d\t%d\t%d\n"
 	return fmt.Sprintf(format, f.id, f.ID(), f.Len, f.Data[:f.Len], f.Data[:f.Len], f.Flags, f.Res0, f.Res1)
 }
