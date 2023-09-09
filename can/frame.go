@@ -1,7 +1,7 @@
 // @@
 // @ Author       : Eacher
 // @ Date         : 2023-09-06 10:48:53
-// @ LastEditTime : 2023-09-09 13:50:30
+// @ LastEditTime : 2023-09-09 13:55:11
 // @ LastEditors  : Eacher
 // @ --------------------------------------------------------------------------------<
 // @ Description  : 
@@ -72,9 +72,9 @@ type Frame struct {
 }
 
 func (f *Frame) initAttr() {
-	f.Extended = f.id & FlagExtended > 0
-	f.Error = f.id & FlagError > 0
-	f.Remote = f.id & FlagRemote > 0
+	f.Extended = f.id & FlagExtended == 1
+	f.Error = f.id & FlagError == 1
+	f.Remote = f.id & FlagRemote == 1
 }
 
 func (f *Frame) SetID(id uint32) error {
@@ -97,7 +97,7 @@ func (f *Frame) SetID(id uint32) error {
 }
 
 func (f Frame) ID() uint32 {
-	if f.id & FlagExtended > 0 || f.id & FlagRemote > 0 || f.id & FlagError > 0 {
+	if f.id & FlagExtended == 1 || f.id & FlagRemote == 1 || f.id & FlagError == 1 {
 		return f.id & MaxExtended
 	}
 	return f.id & MaxStandard
