@@ -1,7 +1,7 @@
 // @@
 // @ Author       : Eacher
 // @ Date         : 2023-09-06 10:48:53
-// @ LastEditTime : 2023-09-09 10:06:05
+// @ LastEditTime : 2023-09-09 10:32:58
 // @ LastEditors  : Eacher
 // @ --------------------------------------------------------------------------------<
 // @ Description  : 
@@ -35,12 +35,14 @@ const (
 func NewCanFrame(b [CanFrameLength]byte) (f Frame) {
 	f = *(*Frame)(unsafe.Pointer(&b[0]))
 	f.initAttr()
+	return
 }
 
 func NewCanFDFrame(b [CanFDFrameLength]byte) (f Frame) {
 	f = *(*Frame)(unsafe.Pointer(&b[0]))
 	f.CanFd = true
 	f.initAttr()
+	return
 }
 
 // 来源 https://www.kernel.org/doc/Documentation/networking/can.txt
