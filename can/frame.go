@@ -1,7 +1,7 @@
 // @@
 // @ Author       : Eacher
 // @ Date         : 2023-09-06 10:48:53
-// @ LastEditTime : 2023-09-09 10:32:58
+// @ LastEditTime : 2023-09-09 11:33:40
 // @ LastEditors  : Eacher
 // @ --------------------------------------------------------------------------------<
 // @ Description  : 
@@ -97,7 +97,7 @@ func (f *Frame) SetID(id uint32) error {
 }
 
 func (f Frame) ID() uint32 {
-	if f.id & FlagExtended > 0 {
+	if f.id & FlagError == 0 && f.id & FlagExtended > 0 {
 		return f.id & MaxExtended
 	}
 	return f.id & MaxStandard
