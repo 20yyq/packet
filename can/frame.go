@@ -1,7 +1,7 @@
 // @@
 // @ Author       : Eacher
 // @ Date         : 2023-09-06 10:48:53
-// @ LastEditTime : 2023-09-09 13:38:59
+// @ LastEditTime : 2023-09-09 13:50:30
 // @ LastEditors  : Eacher
 // @ --------------------------------------------------------------------------------<
 // @ Description  : 
@@ -72,32 +72,32 @@ type Frame struct {
 }
 
 func (f *Frame) initAttr() {
+	f.Extended = f.id & FlagExtended > 0
 	f.Error = f.id & FlagError > 0
-	if !f.Error {
-		f.Extended = f.id & FlagExtended > 0
-	}
 	f.Remote = f.id & FlagRemote > 0
 }
 
 func (f *Frame) SetID(id uint32) error {
-	f.Error = id & FlagError > 0
-	if !f.Error && id > MaxExtended {
+	if id > MaxExtended {
 		return fmt.Errorf("invalid extended Can id: %v does not fit in 29 bits", id)
 	}
 	f.id = id
+	if f.Error {
+		f.id |= FlagError
+	}
 	if f.Remote {
 		f.id |= FlagRemote
 	}
-	if !f.Error && f.Extended {
+	if f.Extended {
 		f.id |= FlagExtended
-	} else if !f.Error && f.id > MaxStandard {
+	} else if f.id > MaxStandard {
 		return fmt.Errorf("invalid standard Can id: %v does not fit in 11 bits", id)
 	}
 	return nil
 }
 
 func (f Frame) ID() uint32 {
-	if f.id & FlagError > 0 || f.id & FlagExtended > 0 {
+	if f.id & FlagExtended > 0 || f.id & FlagRemote > 0 || f.id & FlagError > 0 {
 		return f.id & MaxExtended
 	}
 	return f.id & MaxStandard
