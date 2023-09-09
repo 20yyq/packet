@@ -1,7 +1,7 @@
 // @@
 // @ Author       : Eacher
 // @ Date         : 2023-09-06 10:48:53
-// @ LastEditTime : 2023-09-09 08:10:08
+// @ LastEditTime : 2023-09-09 10:06:05
 // @ LastEditors  : Eacher
 // @ --------------------------------------------------------------------------------<
 // @ Description  : 
@@ -39,7 +39,7 @@ func NewCanFrame(b [CanFrameLength]byte) (f Frame) {
 
 func NewCanFDFrame(b [CanFDFrameLength]byte) (f Frame) {
 	f = *(*Frame)(unsafe.Pointer(&b[0]))
-	f.canfd = true
+	f.CanFd = true
 	f.initAttr()
 }
 
@@ -63,7 +63,7 @@ type Frame struct {
 	Res1		uint8
 	Data		[CanFDDataLength]byte
 	
-	canfd		bool
+	CanFd		bool
 	Extended	bool
 	Remote		bool
 	Error		bool
@@ -78,17 +78,17 @@ func (f *Frame) initAttr() {
 }
 
 func (f *Frame) SetID(id uint32) error {
-	if id > MaxExtended {
+	f.Error = id & FlagError > 0
+	if !f.Error && id > MaxExtended {
 		return fmt.Errorf("invalid extended Can id: %v does not fit in 29 bits", id)
 	}
 	f.id = id
-	f.Error = f.id & FlagError > 0
 	if f.Remote {
 		f.id |= FlagRemote
 	}
 	if !f.Error && f.Extended {
 		f.id |= FlagExtended
-	} else if f.id > MaxStandard {
+	} else if !f.Error && f.id > MaxStandard {
 		return fmt.Errorf("invalid standard Can id: %v does not fit in 11 bits", id)
 	}
 	return nil
@@ -105,12 +105,12 @@ func (f Frame) WireFormat() []byte {
 	var b [CanFDFrameLength]byte
 	*(*uint32)(unsafe.Pointer(&b[0])) = f.id
 	b[4], b[5], b[6], b[7] = f.Len, f.Flags, f.Res0, f.Res1
-	if f.canfd {
+	if f.CanFd {
 		*(*[CanFDDataLength]byte)(b[8:]) = f.Data
-	} else {
-		*(*[CanDataLength]byte)(b[8:]) = ([CanDataLength]byte)(f.Data[:])
+		return b[:]
 	}
-	return b[:(f.Len+8)]
+	*(*[CanDataLength]byte)(b[8:]) = ([CanDataLength]byte)(f.Data[:])
+	return b[:CanFrameLength]
 }
 
 func (f Frame) String() string {
