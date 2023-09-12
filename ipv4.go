@@ -1,7 +1,7 @@
 // @@
 // @ Author       : Eacher
 // @ Date         : 2023-07-13 15:20:40
-// @ LastEditTime : 2023-09-04 09:40:25
+// @ LastEditTime : 2023-09-12 15:07:14
 // @ LastEditors  : Eacher
 // @ --------------------------------------------------------------------------------<
 // @ Description  : 
@@ -22,13 +22,13 @@ const (
 )
 
 // NativeEndian is the machine native endian implementation of ByteOrder.
-var ipv4NativeEndian = binary.LittleEndian
+var ipv4NativeEndian = binary.ByteOrder(binary.LittleEndian)
 
 func init() {
 	b := [4]byte{}
 	*(*uint32)(unsafe.Pointer(&b[0])) = 1
 	if b[0] != 1 {
-		ipv4NativeEndian = binary.BigEndian
+		ipv4NativeEndian = binary.ByteOrder(binary.BigEndian)
 	}
 }
 
