@@ -1,7 +1,7 @@
 // @@
 // @ Author       : Eacher
 // @ Date         : 2023-07-01 15:20:41
-// @ LastEditTime : 2023-09-04 09:40:28
+// @ LastEditTime : 2023-09-12 16:14:45
 // @ LastEditors  : Eacher
 // @ --------------------------------------------------------------------------------<
 // @ Description  : 
@@ -32,6 +32,13 @@ type NlMsgerr struct {
 	Error int32
 	Msg   NlMsghdr
 }
+type NetlinkMessage struct {
+	Header *NlMsghdr
+	Data   []byte
+}
+
+//go:linkname nlmAlignOf syscall.nlmAlignOf
+func nlmAlignOf(msglen int) int
 
 func NewIfInfomsg(b [SizeofIfInfomsg]byte) (info *IfInfomsg) {
 	info = (*IfInfomsg)(unsafe.Pointer(&b[0]))
@@ -92,14 +99,39 @@ func (hdr *NlMsghdr) WireFormatToByte(b *[SizeofNlMsghdr]byte) {
 	*(*uint32)(unsafe.Pointer(&b[12])) = hdr.Pid
 }
 
-func NewNlMsgerr(b [SizeofNlMsgerr]byte) (nlmsg *NlMsgerr) {
-	nlmsg = (*NlMsgerr)(unsafe.Pointer(&b[0]))
+func NewNlMsgerr(b [SizeofNlMsgerr]byte) (nlmsge *NlMsgerr) {
+	nlmsge = (*NlMsgerr)(unsafe.Pointer(&b[0]))
 	return
 }
 
-func (nlmsg *NlMsgerr) WireFormat() []byte {
+func (nlmsge *NlMsgerr) WireFormat() []byte {
 	var b [SizeofNlMsgerr]byte
-	*(*int32)(unsafe.Pointer(&b[0])) = nlmsg.Error
-	nlmsg.Msg.WireFormatToByte((*[SizeofNlMsghdr]byte)(b[4:]))
+	*(*int32)(unsafe.Pointer(&b[0])) = nlmsge.Error
+	nlmsge.Msg.WireFormatToByte((*[SizeofNlMsghdr]byte)(b[4:]))
 	return b[:]
+}
+
+func NewNetlinkMessage(b []byte) (nlmsg []*NetlinkMessage) {
+	for len(b) >= SizeofNlMsghdr {
+		m := &NetlinkMessage{Header: NewNlMsghdr(([SizeofNlMsghdr]byte)(b))}
+		l := nlmAlignOf(int(m.Header.Len))
+		if m.Header.Len < SizeofNlMsghdr || l > len(b) {
+			break
+		}
+		if int(m.Header.Len - SizeofNlMsghdr) < len(b) {
+			m.Data = b[SizeofNlMsghdr:m.Header.Len-SizeofNlMsghdr]
+		} else {
+			m.Data = b[SizeofNlMsghdr:]
+		}
+		b = b[l:]
+		nlmsg = append(nlmsg, m)
+	}
+	return
+}
+
+func (nlmsg NetlinkMessage) WireFormat() []byte {
+	b := make([]byte, SizeofNlMsghdr + len(nlmsg.Data))
+	copy(b, nlmsg.Header.WireFormat())
+	copy(b[SizeofNlMsghdr:], nlmsg.Data)
+	return b
 }
