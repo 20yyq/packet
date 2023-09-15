@@ -1,7 +1,7 @@
 // @@
 // @ Author       : Eacher
 // @ Date         : 2023-07-13 15:20:40
-// @ LastEditTime : 2023-09-12 15:07:14
+// @ LastEditTime : 2023-09-15 10:42:04
 // @ LastEditors  : Eacher
 // @ --------------------------------------------------------------------------------<
 // @ Description  : 
@@ -87,7 +87,7 @@ type IPv4Packet struct {
 	FragOff  uint16
 	TTL      uint8
 	Protocol uint8
-	Checksum uint16
+	checksum uint16
 	Src      IPv4
 	Dst      IPv4
 
@@ -102,21 +102,26 @@ func NewIPv4Packet(b []byte) (ipv4 IPv4Packet, next uint8) {
 	if len(b) < SizeofIPv4Packet {
 		return
 	}
-	ipv4, next = *(*IPv4Packet)(unsafe.Pointer((*[SizeofIPv4Packet]byte)(b))), SizeofIPv4Packet
-	ipv4.IHL = ipv4.Version & 0b00001111 << 2
-	ipv4.Version >>= 4
-	if ipv4.Version != 4 || ipv4.IHL < SizeofIPv4Packet || len(b) < int(ipv4.IHL) {
+	check := make([]byte, SizeofIPv4Packet)
+	copy(check, b[:SizeofIPv4Packet])
+	ipv4, next = *(*IPv4Packet)(unsafe.Pointer(&check[0])), SizeofIPv4Packet
+	if ipv4.IHL = ipv4.Version & 0b00001111 << 2; ipv4.IHL < SizeofIPv4Packet || len(b) < int(ipv4.IHL) {
 		ipv4, next = IPv4Packet{}, 0
 		return
 	}
 	if ipv4.IHL > SizeofIPv4Packet {
-		ipv4.Options, next = make([]byte, ipv4.IHL - SizeofIPv4Packet), ipv4.IHL
-		copy(ipv4.Options, b[SizeofTCPPacket:ipv4.IHL])
+		check = append(check, b[SizeofTCPPacket:ipv4.IHL]...)
+		ipv4.Options, next = check[SizeofTCPPacket:], ipv4.IHL
 	}
+	if *(*uint16)(unsafe.Pointer(&check[10])) = 0; ipv4.checksum != CheckSum(check) {
+		ipv4, next = IPv4Packet{}, 0
+		return
+	}
+	ipv4.Version >>= 4
 	ipv4.TotalLen 	= binary.BigEndian.Uint16(b[2:4])
 	ipv4.ID 		= binary.BigEndian.Uint16(b[4:6])
 	ipv4.FragOff 	= binary.BigEndian.Uint16(b[6:8])
-	ipv4.Checksum 	= binary.BigEndian.Uint16(b[10:12])
+	ipv4.checksum 	= binary.BigEndian.Uint16(b[10:12])
 	switch runtime.GOOS {
 	case "darwin", "ios", "dragonfly", "netbsd":
 		ipv4.TotalLen 	= ipv4NativeEndian.Uint16(b[2:4]) + uint16(ipv4.IHL)
@@ -142,7 +147,6 @@ func (ipv4 IPv4Packet) WireFormat() []byte {
 	binary.BigEndian.PutUint16(b[2:4], ipv4.TotalLen)
 	binary.BigEndian.PutUint16(b[4:6], ipv4.ID)
 	binary.BigEndian.PutUint16(b[6:8], (ipv4.FragOff & 0b0001111111111111) | uint16(ipv4.Flags << 13))
-	binary.BigEndian.PutUint16(b[10:12], ipv4.Checksum)
 	switch runtime.GOOS {
 	case "darwin", "ios", "dragonfly", "netbsd":
 		ipv4NativeEndian.PutUint16(b[2:4], ipv4.TotalLen)
@@ -150,6 +154,7 @@ func (ipv4 IPv4Packet) WireFormat() []byte {
 	}
 	*(*IPv4)(b[12:16]) = ipv4.Src
 	*(*IPv4)(b[16:20]) = ipv4.Dst
+	binary.BigEndian.PutUint16(b[10:12], CheckSum(b))
 	return b
 }
 
@@ -157,7 +162,7 @@ func (ipv4 IPv4Packet) String() string {
 	str := fmt.Sprintf(
 		`V=%d IHL=%d TOS=%#x TotalLen=%d ID=%#x Flags=%#x FragOff=%#x TTL=%d Protocol=%d Checksum=%#x Src=%v Dst=%v`, 
 		ipv4.Version, ipv4.IHL, ipv4.TOS, ipv4.TotalLen, ipv4.ID, ipv4.Flags, 
-		ipv4.FragOff, ipv4.TTL, ipv4.Protocol, ipv4.Checksum, ipv4.Src, ipv4.Dst,
+		ipv4.FragOff, ipv4.TTL, ipv4.Protocol, ipv4.checksum, ipv4.Src, ipv4.Dst,
 	)
 	return str
 }

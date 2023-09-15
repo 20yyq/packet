@@ -1,7 +1,7 @@
 // @@
 // @ Author       : Eacher
 // @ Date         : 2023-07-13 14:02:39
-// @ LastEditTime : 2023-09-04 09:40:21
+// @ LastEditTime : 2023-09-15 10:32:23
 // @ LastEditors  : Eacher
 // @ --------------------------------------------------------------------------------<
 // @ Description  : 
@@ -27,6 +27,48 @@ const hexDigit = "0123456789abcdef"
 const maxIPv4StringLen = len("255.255.255.255")
 
 var Broadcast = HardwareAddr{0xff, 0xff, 0xff, 0xff, 0xff, 0xff}
+
+/*
+
+ //来源 https://www.rfc-editor.org/rfc/rfc1071 [Page 6]
+
+	4.1  "C"
+
+in 6 {
+	// Compute Internet Checksum for "count" bytes
+	// beginning at location "addr".
+	//
+	register long sum = 0;
+
+	while( count > 1 )  {
+		// This is the inner loop
+		sum += * (unsigned short) addr++;
+		count -= 2;
+	}
+	// Add left-over byte, if any
+	if( count > 0 )
+		sum += * (unsigned char *) addr;
+
+	// Fold 32-bit sum to 16 bits
+	while (sum>>16)
+		sum = (sum & 0xffff) + (sum >> 16);
+	checksum = ~sum;
+}
+*/
+
+func CheckSum(b []byte) uint16 {
+    l, i, sum := len(b) - 1, 0, uint64(0)
+    for ; i < l; i += 2 {
+        sum += uint64(*(*uint16)(unsafe.Pointer(&b[i])))
+    }
+    if i == l {
+        sum += uint64(b[i])
+    }
+    for sum >> 16 > 0 {
+        sum = (sum & 0b1111111111111111) + (sum >> 16)
+    }
+    return uint16(^sum)
+}
 
 //go:linkname ubtoa net.ubtoa
 func ubtoa([]byte, int, byte) int
