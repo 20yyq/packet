@@ -1,7 +1,7 @@
 // @@
 // @ Author       : Eacher
 // @ Date         : 2023-07-01 15:20:41
-// @ LastEditTime : 2023-09-12 16:14:45
+// @ LastEditTime : 2023-09-15 15:58:09
 // @ LastEditors  : Eacher
 // @ --------------------------------------------------------------------------------<
 // @ Description  : 
@@ -45,7 +45,7 @@ func NewIfInfomsg(b [SizeofIfInfomsg]byte) (info *IfInfomsg) {
 	return
 }
 
-func (info *IfInfomsg) WireFormat() []byte {
+func (info IfInfomsg) WireFormat() []byte {
 	var b [SizeofIfInfomsg]byte
 	b[0], b[1] = info.Family, info.X__ifi_pad
 	*(*uint16)(unsafe.Pointer(&b[2])) = info.Type
@@ -60,7 +60,7 @@ func NewIfAddrmsg(b [SizeofIfAddrmsg]byte) (addr *IfAddrmsg) {
 	return
 }
 
-func (addr *IfAddrmsg) WireFormat() []byte {
+func (addr IfAddrmsg) WireFormat() []byte {
 	var b [SizeofIfAddrmsg]byte
 	b[0], b[1], b[2], b[3] = addr.Family, addr.Prefixlen, addr.Flags, addr.Scope
 	*(*uint32)(unsafe.Pointer(&b[4])) = addr.Index
@@ -72,7 +72,7 @@ func NewRtMsg(b [SizeofRtMsg]byte) (rtmsg *RtMsg) {
 	return
 }
 
-func (rtmsg *RtMsg) WireFormat() []byte {
+func (rtmsg RtMsg) WireFormat() []byte {
 	var b [SizeofRtMsg]byte
 	b[0], b[1], b[2], b[3] = rtmsg.Family, rtmsg.Dst_len, rtmsg.Src_len, rtmsg.Tos
 	b[4], b[5], b[6], b[7] = rtmsg.Table, rtmsg.Protocol, rtmsg.Scope, rtmsg.Type
@@ -85,13 +85,13 @@ func NewNlMsghdr(b [SizeofNlMsghdr]byte) (hdr *NlMsghdr) {
 	return
 }
 
-func (hdr *NlMsghdr) WireFormat() []byte {
+func (hdr NlMsghdr) WireFormat() []byte {
 	var b [SizeofNlMsghdr]byte
 	hdr.WireFormatToByte(&b)
 	return b[:]
 }
 
-func (hdr *NlMsghdr) WireFormatToByte(b *[SizeofNlMsghdr]byte) {
+func (hdr NlMsghdr) WireFormatToByte(b *[SizeofNlMsghdr]byte) {
 	*(*uint32)(unsafe.Pointer(&b[0])) = hdr.Len
 	*(*uint16)(unsafe.Pointer(&b[4])) = hdr.Type
 	*(*uint16)(unsafe.Pointer(&b[6])) = hdr.Flags
@@ -104,7 +104,7 @@ func NewNlMsgerr(b [SizeofNlMsgerr]byte) (nlmsge *NlMsgerr) {
 	return
 }
 
-func (nlmsge *NlMsgerr) WireFormat() []byte {
+func (nlmsge NlMsgerr) WireFormat() []byte {
 	var b [SizeofNlMsgerr]byte
 	*(*int32)(unsafe.Pointer(&b[0])) = nlmsge.Error
 	nlmsge.Msg.WireFormatToByte((*[SizeofNlMsghdr]byte)(b[4:]))
