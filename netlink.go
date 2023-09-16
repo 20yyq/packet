@@ -1,7 +1,7 @@
 // @@
 // @ Author       : Eacher
 // @ Date         : 2023-07-01 15:20:41
-// @ LastEditTime : 2023-09-16 08:52:35
+// @ LastEditTime : 2023-09-16 11:58:40
 // @ LastEditors  : Eacher
 // @ --------------------------------------------------------------------------------<
 // @ Description  : 
@@ -17,6 +17,7 @@ import (
 
 const (
 	SizeofNlMsghdr 	= syscall.SizeofNlMsghdr
+	SizeofNlAttr 	= syscall.SizeofNlAttr
 	SizeofRtAttr 	= syscall.SizeofRtAttr
 	SizeofNlMsgerr 	= syscall.SizeofNlMsgerr
 	SizeofIfAddrmsg = syscall.SizeofIfAddrmsg
@@ -38,6 +39,10 @@ type NetlinkMessage struct {
 }
 type RtAttr struct {
 	*syscall.RtAttr
+	Data   []byte
+}
+type NlAttr struct {
+	*syscall.NlAttr
 	Data   []byte
 }
 
@@ -182,3 +187,23 @@ func (rta RtAttr) WireFormat() []byte {
 	return b
 }
 
+func NewNlAttrs(b []byte) ([]*NlAttr, error) {
+	var attrs []*NlAttr
+	for len(b) >= SizeofNlAttr {
+		nl := (*syscall.NlAttr)(unsafe.Pointer(&b[0]))
+		if int(nl.Len) < SizeofNlAttr || int(nl.Len) > len(b) {
+			return nil, syscall.EINVAL
+		}
+		attrs = append(attrs, &NlAttr{NlAttr: nl, Data: b[SizeofNlAttr:nl.Len]})
+		b = b[rtaAlignOf(int(nl.Len)):]
+	}
+	return attrs, nil
+}
+
+func (nla NlAttr) WireFormat() []byte {
+	b := make([]byte, SizeofNlAttr + len(nla.Data))
+	*(*uint16)(unsafe.Pointer(&b[0])) = nla.Len
+	*(*uint16)(unsafe.Pointer(&b[2])) = nla.Type
+	copy(b[SizeofNlAttr:], nla.Data)
+	return b
+}
