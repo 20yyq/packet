@@ -1,7 +1,7 @@
 // @@
 // @ Author       : Eacher
 // @ Date         : 2023-07-01 15:20:41
-// @ LastEditTime : 2023-09-15 15:58:09
+// @ LastEditTime : 2023-09-16 08:52:35
 // @ LastEditors  : Eacher
 // @ --------------------------------------------------------------------------------<
 // @ Description  : 
@@ -36,9 +36,16 @@ type NetlinkMessage struct {
 	Header *NlMsghdr
 	Data   []byte
 }
+type RtAttr struct {
+	*syscall.RtAttr
+	Data   []byte
+}
 
 //go:linkname nlmAlignOf syscall.nlmAlignOf
 func nlmAlignOf(msglen int) int
+
+//go:linkname rtaAlignOf syscall.rtaAlignOf
+func rtaAlignOf(attrlen int) int
 
 func NewIfInfomsg(b [SizeofIfInfomsg]byte) (info *IfInfomsg) {
 	info = (*IfInfomsg)(unsafe.Pointer(&b[0]))
@@ -135,3 +142,43 @@ func (nlmsg NetlinkMessage) WireFormat() []byte {
 	copy(b[SizeofNlMsghdr:], nlmsg.Data)
 	return b
 }
+
+// ParseNetlinkRouteAttr parses m's payload as an array of netlink
+// route attributes and returns the slice containing the
+// NetlinkRouteAttr structures.
+func ParseNetlinkRouteAttr(m *NetlinkMessage) ([]*RtAttr, error) {
+	var b []byte
+	switch m.Header.Type {
+	case syscall.RTM_NEWLINK, syscall.RTM_DELLINK:
+		b = m.Data[SizeofIfInfomsg:]
+	case syscall.RTM_NEWADDR, syscall.RTM_DELADDR:
+		b = m.Data[SizeofIfAddrmsg:]
+	case syscall.RTM_NEWROUTE, syscall.RTM_DELROUTE:
+		b = m.Data[SizeofRtMsg:]
+	default:
+		return nil, syscall.EINVAL
+	}
+	return NewRtAttrs(b)
+}
+
+func NewRtAttrs(b []byte) ([]*RtAttr, error) {
+	var attrs []*RtAttr
+	for len(b) >= SizeofRtAttr {
+		r := (*syscall.RtAttr)(unsafe.Pointer(&b[0]))
+		if int(r.Len) < SizeofRtAttr || int(r.Len) > len(b) {
+			return nil, syscall.EINVAL
+		}
+		attrs = append(attrs, &RtAttr{RtAttr: r, Data: b[SizeofRtAttr:r.Len]})
+		b = b[rtaAlignOf(int(r.Len)):]
+	}
+	return attrs, nil
+}
+
+func (rta RtAttr) WireFormat() []byte {
+	b := make([]byte, SizeofRtAttr + len(rta.Data))
+	*(*uint16)(unsafe.Pointer(&b[0])) = rta.Len
+	*(*uint16)(unsafe.Pointer(&b[2])) = rta.Type
+	copy(b[SizeofRtAttr:], rta.Data)
+	return b
+}
+
