@@ -1,7 +1,7 @@
 // @@
 // @ Author       : Eacher
 // @ Date         : 2023-07-01 15:20:41
-// @ LastEditTime : 2023-09-16 11:58:40
+// @ LastEditTime : 2023-09-18 10:38:59
 // @ LastEditors  : Eacher
 // @ --------------------------------------------------------------------------------<
 // @ Description  : 
@@ -163,20 +163,20 @@ func ParseNetlinkRouteAttr(m *NetlinkMessage) ([]*RtAttr, error) {
 	default:
 		return nil, syscall.EINVAL
 	}
-	return NewRtAttrs(b)
+	return NewRtAttrs(b), nil
 }
 
-func NewRtAttrs(b []byte) ([]*RtAttr, error) {
+func NewRtAttrs(b []byte) []*RtAttr {
 	var attrs []*RtAttr
 	for len(b) >= SizeofRtAttr {
 		r := (*syscall.RtAttr)(unsafe.Pointer(&b[0]))
 		if int(r.Len) < SizeofRtAttr || int(r.Len) > len(b) {
-			return nil, syscall.EINVAL
+			break
 		}
 		attrs = append(attrs, &RtAttr{RtAttr: r, Data: b[SizeofRtAttr:r.Len]})
 		b = b[rtaAlignOf(int(r.Len)):]
 	}
-	return attrs, nil
+	return attrs
 }
 
 func (rta RtAttr) WireFormat() []byte {
@@ -187,17 +187,17 @@ func (rta RtAttr) WireFormat() []byte {
 	return b
 }
 
-func NewNlAttrs(b []byte) ([]*NlAttr, error) {
+func NewNlAttrs(b []byte) []*NlAttr {
 	var attrs []*NlAttr
 	for len(b) >= SizeofNlAttr {
 		nl := (*syscall.NlAttr)(unsafe.Pointer(&b[0]))
 		if int(nl.Len) < SizeofNlAttr || int(nl.Len) > len(b) {
-			return nil, syscall.EINVAL
+			break
 		}
 		attrs = append(attrs, &NlAttr{NlAttr: nl, Data: b[SizeofNlAttr:nl.Len]})
 		b = b[rtaAlignOf(int(nl.Len)):]
 	}
-	return attrs, nil
+	return attrs
 }
 
 func (nla NlAttr) WireFormat() []byte {
