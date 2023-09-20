@@ -1,7 +1,7 @@
 // @@
 // @ Author       : Eacher
 // @ Date         : 2023-07-01 15:20:41
-// @ LastEditTime : 2023-09-18 10:38:59
+// @ LastEditTime : 2023-09-20 09:44:57
 // @ LastEditors  : Eacher
 // @ --------------------------------------------------------------------------------<
 // @ Description  : 
@@ -131,7 +131,7 @@ func NewNetlinkMessage(b []byte) (nlmsg []*NetlinkMessage) {
 			break
 		}
 		if int(m.Header.Len - SizeofNlMsghdr) < len(b) {
-			m.Data = b[SizeofNlMsghdr:m.Header.Len-SizeofNlMsghdr]
+			m.Data = b[SizeofNlMsghdr:m.Header.Len]
 		} else {
 			m.Data = b[SizeofNlMsghdr:]
 		}
